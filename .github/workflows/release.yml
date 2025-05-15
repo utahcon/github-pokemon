@@ -3,8 +3,11 @@ name: Build and Release
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -31,14 +34,6 @@ jobs:
         with:
           go-version: "stable"
           check-latest: true
-
-      - name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
 
       - name: Build static binary
         env:
@@ -68,7 +63,7 @@ jobs:
         run: ls -R
 
       - name: Create release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v1
         with:
           files: |
             github-pokemon-linux-amd64/github-pokemon-linux-amd64
@@ -77,5 +72,8 @@ jobs:
             github-pokemon-darwin-arm64/github-pokemon-darwin-arm64
             github-pokemon-windows-amd64/github-pokemon-windows-amd64.exe
             github-pokemon-windows-arm64/github-pokemon-windows-arm64.exe
+          draft: false
+          prerelease: false
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
