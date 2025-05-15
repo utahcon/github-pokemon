@@ -1,0 +1,60 @@
+#!/bin/bash
+
+# Color escape codes
+RED='\033[0;31m'
+YELLOW='\033[0;33m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+echo -e "${YELLOW}Running pre-push checks...${NC}"
+
+# Get the name of the current branch
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+echo -e "Current branch: ${YELLOW}${CURRENT_BRANCH}${NC}"
+
+# Get the target branch (assuming push to origin)
+TARGET_BRANCH=$(git for-each-ref --format='%(upstream:short)' "$(git symbolic-ref -q HEAD)" | cut -d '/' -f 2)
+echo -e "Target branch: ${YELLOW}${TARGET_BRANCH}${NC}"
+
+# Skip hooks for non-main target branches
+if [ "$TARGET_BRANCH" != "main" ]; then
+    echo -e "${GREEN}Not pushing to main, skipping version checks${NC}"
+    exit 0
+fi
+
+# Skip checks for certain branches or paths
+if [[ "$CURRENT_BRANCH" == "main" ]]; then
+    echo -e "${YELLOW}On main branch, skipping version checks${NC}"
+    exit 0
+fi
+
+# Check if the current branch is pushing to main
+echo -e "${YELLOW}Pushing to main branch detected, running version checks...${NC}"
+
+# Check for changes to VERSION or other version-containing files
+if git diff --cached --name-only | grep -q 'VERSION\|CHANGELOG.md'; then
+    echo -e "${YELLOW}Version-related files changed, checking version compliance...${NC}"
+    
+    # Run the version check script if it exists
+    if [ -f "./scripts/check-version.sh" ]; then
+        echo -e "${YELLOW}Running version check script in strict mode...${NC}"
+        if ! ./scripts/check-version.sh --strict; then
+            echo -e "${RED}Version check failed! Please update the version and CHANGELOG before pushing.${NC}"
+            echo -e "${YELLOW}Tips:${NC}"
+            echo -e "1. Update the version in VERSION file"
+            echo -e "2. Update the CHANGELOG.md with your changes"
+            echo -e "3. Run ./scripts/check-version.sh --strict to verify"
+            exit 1
+        else
+            echo -e "${GREEN}Version check passed!${NC}"
+        fi
+    else
+        echo -e "${RED}Warning: scripts/check-version.sh not found, skipping version check${NC}"
+    fi
+else
+    echo -e "${YELLOW}No version-related files changed, skipping version check${NC}"
+fi
+
+# Successful check
+echo -e "${GREEN}All pre-push checks passed!${NC}"
+exit 0

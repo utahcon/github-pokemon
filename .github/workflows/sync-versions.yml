@@ -1,0 +1,90 @@
+name: Sync Version References
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'VERSION'
+      - 'CHANGELOG.md'
+
+jobs:
+  sync-versions:
+    name: Synchronize Version References
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract version
+        id: extract-version
+        run: |
+          if [ -f "VERSION" ]; then
+            VERSION=$(cat VERSION | tr -d '[:space:]')
+            echo "VERSION=$VERSION" >> $GITHUB_ENV
+            echo "Version extracted: $VERSION"
+          else
+            echo "::error::VERSION file not found"
+            exit 1
+          fi
+      
+      - name: Run version synchronization script
+        id: sync-version
+        run: |
+          # Make script executable
+          chmod +x ./scripts/sync-versions.sh
+          
+          # Run the script and capture output
+          SYNC_OUTPUT=$(./scripts/sync-versions.sh)
+          echo "$SYNC_OUTPUT"
+          
+          # Check if any files were updated
+          if echo "$SYNC_OUTPUT" | grep -q "Files updated: 0"; then
+            echo "UPDATE_NEEDED=false" >> $GITHUB_ENV
+            echo "No files needed updating"
+          else
+            echo "UPDATE_NEEDED=true" >> $GITHUB_ENV
+            echo "Files were updated"
+          fi
+          
+          # Extract README version for the summary
+          README_VERSION=$(grep -oP 'Repository Manager \(v\K[^)]+' README.md || echo "none")
+          echo "README_VERSION=$README_VERSION" >> $GITHUB_ENV
+      
+      - name: Commit and push changes
+        if: env.UPDATE_NEEDED == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Add all potential modified files
+          git add README.md CHANGELOG.md docs/* *.md *.html *.txt
+          
+          # Only commit if there are changes
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "docs: sync version references to v$VERSION [skip ci]"
+            git push
+            echo "Changes committed and pushed"
+          fi
+      
+      - name: Create summary
+        run: |
+          echo "## Version Synchronization Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| ---- | ----- |" >> $GITHUB_STEP_SUMMARY
+          echo "| Detected version | v$VERSION |" >> $GITHUB_STEP_SUMMARY
+          echo "| README version after sync | v$README_VERSION |" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$UPDATE_NEEDED" = "true" ]; then
+            echo "| Status | ✅ Updated version references |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Status | ℹ️ No updates needed |" >> $GITHUB_STEP_SUMMARY
+          fi

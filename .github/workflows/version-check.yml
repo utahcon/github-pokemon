@@ -1,0 +1,119 @@
+name: Verify Version Increment
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'VERSION'
+      - 'CHANGELOG.md'
+
+jobs:
+  check-version:
+    name: Check for Version Increment
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout current branch
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+      
+      - name: Get main branch version
+        id: main_version
+        run: |
+          git fetch origin main
+          git checkout origin/main
+          if [ -f "VERSION" ]; then
+            MAIN_VERSION=$(cat VERSION | tr -d '[:space:]')
+          else
+            MAIN_VERSION="0.0.0"
+            echo "No VERSION file found in main branch, using 0.0.0 as base version"
+          fi
+          echo "MAIN_VERSION=$MAIN_VERSION" >> $GITHUB_ENV
+          git checkout -
+      
+      - name: Get PR branch version
+        run: |
+          if [ -f "VERSION" ]; then
+            PR_VERSION=$(cat VERSION | tr -d '[:space:]')
+          else
+            PR_VERSION="0.0.0"
+            echo "::error::VERSION file not found in PR branch"
+            exit 1
+          fi
+          echo "PR_VERSION=$PR_VERSION" >> $GITHUB_ENV
+      
+      - name: Check version increment
+        run: |
+          echo "Main branch version: $MAIN_VERSION"
+          echo "PR branch version: $PR_VERSION"
+          
+          # Convert to semver for comparison
+          MAIN_MAJOR=$(echo $MAIN_VERSION | cut -d. -f1)
+          MAIN_MINOR=$(echo $MAIN_VERSION | cut -d. -f2)
+          MAIN_PATCH=$(echo $MAIN_VERSION | cut -d. -f3 | sed 's/[^0-9].*$//')
+          
+          PR_MAJOR=$(echo $PR_VERSION | cut -d. -f1)
+          PR_MINOR=$(echo $PR_VERSION | cut -d. -f2)
+          PR_PATCH=$(echo $PR_VERSION | cut -d. -f3 | sed 's/[^0-9].*$//')
+          
+          # Validate semver format
+          if ! [[ $PR_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.]+)?(\+[a-zA-Z0-9\.]+)?$ ]]; then
+            echo "::error::PR version '$PR_VERSION' does not follow semantic versioning (semver) format"
+            exit 1
+          fi
+          
+          # Check if version incremented
+          if [[ $PR_MAJOR -gt $MAIN_MAJOR ]]; then
+            echo "Major version increment detected"
+            echo "VERSION_INCREMENTED=true" >> $GITHUB_ENV
+          elif [[ $PR_MAJOR -eq $MAIN_MAJOR && $PR_MINOR -gt $MAIN_MINOR ]]; then
+            echo "Minor version increment detected"
+            echo "VERSION_INCREMENTED=true" >> $GITHUB_ENV
+          elif [[ $PR_MAJOR -eq $MAIN_MAJOR && $PR_MINOR -eq $MAIN_MINOR && $PR_PATCH -gt $MAIN_PATCH ]]; then
+            echo "Patch version increment detected"
+            echo "VERSION_INCREMENTED=true" >> $GITHUB_ENV
+          else
+            echo "::error::Version must be incremented for PR to main. Found $MAIN_VERSION in main and $PR_VERSION in PR."
+            echo "VERSION_INCREMENTED=false" >> $GITHUB_ENV
+            exit 1
+          fi
+      
+      - name: Check CHANGELOG update
+        run: |
+          if [ ! -f "CHANGELOG.md" ]; then
+            echo "::error::CHANGELOG.md file not found"
+            exit 1
+          fi
+          
+          if ! grep -q "\[$PR_VERSION\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md does not contain an entry for version $PR_VERSION"
+            exit 1
+          fi
+          
+          if [[ $(grep -c "\[$PR_VERSION\]" CHANGELOG.md) -gt 1 ]]; then
+            echo "::warning::Multiple entries for version $PR_VERSION found in CHANGELOG.md"
+          fi
+          
+          if ! grep -q "## \[$PR_VERSION\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md does not contain a proper heading for version $PR_VERSION"
+            exit 1
+          fi
+          
+          echo "CHANGELOG contains entry for version $PR_VERSION"
+          
+      - name: Add summary
+        run: |
+          echo "## Version Check Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "| ---- | ------ |" >> $GITHUB_STEP_SUMMARY
+          echo "| Main branch version | $MAIN_VERSION |" >> $GITHUB_STEP_SUMMARY
+          echo "| PR branch version | $PR_VERSION |" >> $GITHUB_STEP_SUMMARY
+          echo "| Version incremented | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| CHANGELOG updated | ✅ |" >> $GITHUB_STEP_SUMMARY

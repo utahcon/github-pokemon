@@ -6,11 +6,29 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/google/go-github/v63/github"
 	"github.com/spf13/cobra"
 )
+
+// Version information - read from VERSION file at init time
+var (
+	version string
+)
+
+func init() {
+	// Read version from file
+	versionBytes, err := os.ReadFile("VERSION")
+	if err != nil {
+		// If VERSION file not found, use development version
+		version = "0.0.0-dev"
+	} else {
+		// Trim whitespace and newlines
+		version = strings.TrimSpace(string(versionBytes))
+	}
+}
 
 var (
 	organization   string
@@ -18,6 +36,7 @@ var (
 	skipUpdate     bool
 	verbose        bool
 	parallelLimit  int
+	showVersion    bool
 )
 
 // WriteLogger is a helper to safely write to a buffer from multiple goroutines
@@ -47,7 +66,22 @@ for existing repositories.
 GitHub API credentials are expected to be in environment variables:
 - GITHUB_TOKEN: Personal access token for GitHub API`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if showVersion {
+			fmt.Printf("github-pokemon version %s\n", version)
+			return nil
+		}
 		return runRootCommand()
+	},
+	// Check before validation if we're just showing version
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// If showing version, we don't need to check for required flags
+		if cmd.Flag("version").Changed {
+			showVersion = true
+			// Prevent cobra from validating the org and path flags
+			cmd.Flags().Set("org", "dummy-value")
+			cmd.Flags().Set("path", "dummy-value")
+		}
+		return nil
 	},
 	SilenceUsage: true,
 }
@@ -67,10 +101,11 @@ func init() {
 	rootCmd.Flags().BoolVarP(&skipUpdate, "skip-update", "s", false, "Skip updating existing repositories")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
 	rootCmd.Flags().IntVarP(&parallelLimit, "parallel", "j", 5, "Number of repositories to process in parallel")
+	rootCmd.Flags().BoolVarP(&showVersion, "version", "V", false, "Show version information and exit")
 	
-	// Mark flags as required
-	rootCmd.MarkFlagRequired("org")
-	rootCmd.MarkFlagRequired("path")
+		// Mark flags as required
+		rootCmd.MarkFlagRequired("org")
+		rootCmd.MarkFlagRequired("path")
 }
 
 // worker function for parallel processing
@@ -123,6 +158,17 @@ func processRepository(repo *github.Repository, repoPath string, skipUpdate bool
 		err := cmd.Run()
 		if err != nil {
 			errMsg := fmt.Sprintf("Error cloning repository %s: %v\n%s", repoName, err, outputBuffer)
+			
+			// Provide helpful authentication guidance
+			if strings.Contains(errMsg, "authenticity") || strings.Contains(errMsg, "permission denied") || 
+			   strings.Contains(errMsg, "could not read Username") || strings.Contains(errMsg, "auth") {
+				errMsg += "\n\nAuthentication error detected. Please ensure:\n" +
+					"1. Your SSH key is set up correctly with GitHub: https://docs.github.com/en/authentication/connecting-to-github-with-ssh\n" +
+					"2. Your GITHUB_TOKEN has sufficient permissions\n" +
+					"3. For SSH: Your SSH agent is running ('eval $(ssh-agent -s)')\n" +
+					"4. For HTTPS: You may need to configure credential helper ('git config --global credential.helper cache')"
+			}
+			
 			return false, errMsg
 		}
 	
@@ -144,6 +190,17 @@ func processRepository(repo *github.Repository, repoPath string, skipUpdate bool
 		if err != nil {
 			errMsg := fmt.Sprintf("Warning: Failed to fetch for repository %s: %v\n%s", 
 				repoName, err, fetchOutput)
+				
+			// Provide helpful authentication guidance for fetch errors
+			if strings.Contains(string(fetchOutput), "authenticity") || strings.Contains(string(fetchOutput), "permission denied") || 
+			   strings.Contains(string(fetchOutput), "could not read Username") || strings.Contains(string(fetchOutput), "auth") {
+				errMsg += "\n\nAuthentication error detected. Please ensure:\n" +
+					"1. Your SSH key is set up correctly with GitHub: https://docs.github.com/en/authentication/connecting-to-github-with-ssh\n" +
+					"2. Your GITHUB_TOKEN has sufficient permissions\n" +
+					"3. For SSH: Your SSH agent is running ('eval $(ssh-agent -s)')\n" +
+					"4. For HTTPS: You may need to configure credential helper ('git config --global credential.helper cache')"
+			}
+			
 			return false, errMsg
 		}
 	
@@ -165,6 +222,11 @@ func processRepository(repo *github.Repository, repoPath string, skipUpdate bool
 }
 
 func runRootCommand() error {
+	// Check if git is installed
+	if _, err := exec.LookPath("git"); err != nil {
+		return fmt.Errorf("git is not installed or not in PATH: %w", err)
+	}
+
 	// Ensure target path exists
 	if err := os.MkdirAll(targetPath, 0755); err != nil {
 		return fmt.Errorf("failed to create target directory: %w", err)
@@ -173,7 +235,7 @@ func runRootCommand() error {
 	// Get GitHub token from environment
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
-		return fmt.Errorf("GITHUB_TOKEN environment variable not set")
+		return fmt.Errorf("GITHUB_TOKEN environment variable not set. Please set it with: export GITHUB_TOKEN=\"your-personal-access-token\"")
 	}
 
 	if verbose {
@@ -249,6 +311,7 @@ func runRootCommand() error {
 	// Collect results
 	processedCount := 0
 	errorCount := 0
+	var authErrors bool
 	
 	for i := 0; i < len(nonArchivedRepos); i++ {
 		result := <-results
@@ -258,6 +321,10 @@ func runRootCommand() error {
 		
 		if !result.success {
 			errorCount++
+			// Check if this was an authentication error
+			if strings.Contains(result.message, "Authentication error detected") {
+				authErrors = true
+			}
 		}
 	}
 
@@ -266,6 +333,12 @@ func runRootCommand() error {
 	
 	if errorCount > 0 {
 		fmt.Printf("Encountered %d errors during processing\n", errorCount)
+		
+		if authErrors {
+			fmt.Printf("\nSome authentication errors were detected. Please verify your setup:\n")
+			fmt.Printf("1. SSH setup guide: https://docs.github.com/en/authentication/connecting-to-github-with-ssh\n")
+			fmt.Printf("2. Personal access token guide: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token\n")
+		}
 	} else {
 		fmt.Printf("All repositories processed successfully\n")
 	}
