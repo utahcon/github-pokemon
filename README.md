@@ -1,6 +1,6 @@
 # GitHub Repository Manager
 
-[![Build and Release](https://github.com/yourusername/github-pokemon/actions/workflows/release.yml/badge.svg)](https://github.com/yourusername/github-pokemon/actions/workflows/release.yml)
+[![Build and Release](https://github.com/utahcon/github-pokemon/actions/workflows/release.yml/badge.svg)](https://github.com/utahcon/github-pokemon/actions/workflows/release.yml)
 
 A Go tool for efficiently managing multiple GitHub repositories from an organization.
 
@@ -16,7 +16,7 @@ A Go tool for efficiently managing multiple GitHub repositories from an organiza
 
 ### Download Pre-built Binary
 
-You can download the latest pre-built binary for your platform from the [Releases](https://github.com/yourusername/github-pokemon/releases) page.
+You can download the latest pre-built binary for your platform from the [Releases](https://github.com/utahcon/github-pokemon/releases) page.
 
 We provide builds for:
 - Linux (amd64, arm64)
@@ -33,7 +33,7 @@ chmod +x github-pokemon-*
 
 ```bash
 # Clone this repository
-git clone https://github.com/yourusername/github-pokemon.git
+git clone https://github.com/utahcon/github-pokemon.git
 cd github-pokemon
 
 # Build the binary
