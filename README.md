@@ -1,5 +1,7 @@
 # GitHub Repository Manager
 
+[![Build and Release](https://github.com/yourusername/github-pokemon/actions/workflows/release.yml/badge.svg)](https://github.com/yourusername/github-pokemon/actions/workflows/release.yml)
+
 A Go tool for efficiently managing multiple GitHub repositories from an organization.
 
 ## Features
@@ -11,6 +13,23 @@ A Go tool for efficiently managing multiple GitHub repositories from an organiza
 - Safe operations - never modifies local working directories
 
 ## Installation
+
+### Download Pre-built Binary
+
+You can download the latest pre-built binary for your platform from the [Releases](https://github.com/yourusername/github-pokemon/releases) page.
+
+We provide builds for:
+- Linux (amd64, arm64)
+- macOS (amd64, arm64)
+- Windows (amd64, arm64)
+
+After downloading, make the binary executable:
+
+```bash
+chmod +x github-pokemon-*
+```
+
+### Build from Source
 
 ```bash
 # Clone this repository
@@ -122,3 +141,17 @@ crontab -e
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+### Releasing
+
+This project uses GitHub Actions to automatically build and release binaries:
+
+1. Create and push a tag with version number:
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+
+2. The GitHub Action will automatically build binaries for all supported platforms and create a release.
+
+3. You can also manually trigger a build using the "workflow_dispatch" event in GitHub Actions.

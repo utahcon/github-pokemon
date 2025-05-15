@@ -1,0 +1,81 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Static Binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+        include:
+          - goos: windows
+            ext: .exe
+          - goos: linux
+            ext: ""
+          - goos: darwin
+            ext: ""
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "stable"
+          check-latest: true
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Build static binary
+        env:
+          CGO_ENABLED: 0
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GO111MODULE: on
+        run: |
+          go build -a -ldflags="-w -s -extldflags '-static'" -o github-pokemon-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} .
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-pokemon-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: github-pokemon-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Display structure of downloaded files
+        run: ls -R
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            github-pokemon-linux-amd64/github-pokemon-linux-amd64
+            github-pokemon-linux-arm64/github-pokemon-linux-arm64
+            github-pokemon-darwin-amd64/github-pokemon-darwin-amd64
+            github-pokemon-darwin-arm64/github-pokemon-darwin-arm64
+            github-pokemon-windows-amd64/github-pokemon-windows-amd64.exe
+            github-pokemon-windows-arm64/github-pokemon-windows-arm64.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
