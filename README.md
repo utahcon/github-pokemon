@@ -1,4 +1,4 @@
-# GitHub Repository Manager (v1.0.2-builds)
+# GitHub Repository Manager (v1.0.2)
 
 [![Build and Release](https://github.com/utahcon/github-pokemon/actions/workflows/release.yml/badge.svg)](https://github.com/utahcon/github-pokemon/actions/workflows/release.yml)
 
