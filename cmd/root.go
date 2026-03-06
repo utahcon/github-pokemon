@@ -11,7 +11,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/spf13/cobra"
 )
 
