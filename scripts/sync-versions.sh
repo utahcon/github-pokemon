@@ -49,7 +49,7 @@ update_version() {
             cp "$file" "${file}.bak"
             
             # Replace the pattern
-            sed -i "s/$pattern/$replacement/g" "$file"
+            sed -i "s|$pattern|$replacement|g" "$file"
             
             # Check if file was modified
             if diff -q "$file" "${file}.bak" > /dev/null; then
@@ -87,7 +87,7 @@ echo -e "  ${GREEN}✓ Updated VERSION file${NC}"
 
 # Search for other files containing version references
 echo -e "\n${YELLOW}Searching for other files with version references...${NC}"
-for file in $(grep -r --include="*.md" --include="*.go" --include="*.html" --include="*.txt" -l "v[0-9]\+\.[0-9]\+\.[0-9]\+" . | grep -v "CHANGELOG.md" | grep -v "VERSION" | grep -v "README.md"); do
+for file in $(grep -r --exclude-dir=.git --include="*.md" --include="*.go" --include="*.html" --include="*.txt" -l "v[0-9]\+\.[0-9]\+\.[0-9]\+" . | grep -v "CHANGELOG.md" | grep -v "VERSION" | grep -v "README.md"); do
     echo -e "${YELLOW}Checking ${file}...${NC}"
     
     # Update explicit version references (customize patterns as needed)

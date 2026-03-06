@@ -21,6 +21,8 @@ vendor/
 /bin/
 /pkg/
 /build/
+/dist/
+/dist/
 
 # Tools and cache
 /.tools/
