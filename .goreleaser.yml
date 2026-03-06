@@ -40,17 +40,7 @@ checksum:
   algorithm: sha256
 
 changelog:
-  sort: asc
-  filters:
-    include:
-      - "^feat"
-      - "^fix"
-      - "^refactor"
-      - "^perf"
-      - "^docs"
-      - "^test"
-      - "^ci"
-      - "^chore"
+  disable: true
 
 release:
   github:
