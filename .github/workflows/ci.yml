@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: ["1.25", "stable"]
+        go-version: ["1.26", "stable"]
 
     steps:
       - name: Checkout code
@@ -49,7 +49,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25"
+          go-version: "1.26"
 
       - name: Run go vet
         run: go vet ./...
@@ -69,7 +69,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25"
+          go-version: "1.26"
 
       - name: Check GoReleaser config
         uses: goreleaser/goreleaser-action@v6
