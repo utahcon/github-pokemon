@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0](https://github.com/utahcon/github-pokemon/compare/v1.0.0...v1.1.0) (2026-03-06)
+
+
+### Features
+
+* add GoReleaser, CI pipeline, and security hardening ([cbb4e6f](https://github.com/utahcon/github-pokemon/commit/cbb4e6f067be877a81fcca385287c6558cf9886c))
+* GoReleaser, CI pipeline, and automated releases ([fa416f6](https://github.com/utahcon/github-pokemon/commit/fa416f6f0f2c68958bf162fafa406f1266033172))
+* GoReleaser, CI pipeline, and security hardening ([f75fc9e](https://github.com/utahcon/github-pokemon/commit/f75fc9eff9691a230d5de063bc1a81ba0cfe1879))
+* replace manual versioning with release-please ([6bfa62f](https://github.com/utahcon/github-pokemon/commit/6bfa62f59a8c12fefd3a981f6049597e12fb7b32))
+* support version detection via go install ([8af98e9](https://github.com/utahcon/github-pokemon/commit/8af98e97930c3fa1405f8a6426ee8bf367599098))
+
+
+### Bug Fixes
+
+* address code review feedback ([d88d54a](https://github.com/utahcon/github-pokemon/commit/d88d54a64faa5373ecacb4c9a7880cbb85d6a0f5))
+* check MarkFlagRequired return values to satisfy errcheck lint ([659bec9](https://github.com/utahcon/github-pokemon/commit/659bec9bb27bb76782feed96a0ad06a75949452e))
+* pin golangci-lint to v2.11.1 for Go 1.26 compatibility ([b392161](https://github.com/utahcon/github-pokemon/commit/b392161b78d7fa04bc2f40c673796732ef8c474a))
+* upgrade golangci-lint-action to v7 for golangci-lint v2 support ([0d46c42](https://github.com/utahcon/github-pokemon/commit/0d46c42e4abeaa75c286a85628c53ff80b84e729))
+* use non-deprecated goreleaser v2 archive format syntax ([6c114ba](https://github.com/utahcon/github-pokemon/commit/6c114ba6b10cf7f281cd339eca8f79efd89f2a99))
+
 ## [1.0.2-builds] - 2023-10-16
 
 ### Added
