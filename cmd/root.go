@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -99,10 +98,11 @@ func init() {
 
 // isAuthRelated returns true if the output contains authentication-related keywords.
 func isAuthRelated(output string) bool {
-	return strings.Contains(output, "authenticity") ||
-		strings.Contains(output, "permission denied") ||
-		strings.Contains(output, "could not read Username") ||
-		strings.Contains(output, "auth")
+	lower := strings.ToLower(output)
+	return strings.Contains(lower, "authenticity") ||
+		strings.Contains(lower, "permission denied") ||
+		strings.Contains(lower, "could not read username") ||
+		strings.Contains(lower, "auth")
 }
 
 // processRepository handles cloning or fetching for a single repository.
@@ -117,15 +117,12 @@ func processRepository(ctx context.Context, repo *github.Repository, repoPath st
 			cloneURL = repo.GetCloneURL()
 		}
 
-		var outputBuffer bytes.Buffer
-
 		cmd := exec.CommandContext(ctx, "git", "clone", cloneURL, repoPath)
-		cmd.Stdout = &outputBuffer
-		cmd.Stderr = &outputBuffer
+		output, err := cmd.CombinedOutput()
 
-		if err := cmd.Run(); err != nil {
-			cloneErr := fmt.Errorf("cloning repository %s: %w\n%s", repoName, err, outputBuffer.String())
-			if isAuthRelated(outputBuffer.String()) {
+		if err != nil {
+			cloneErr := fmt.Errorf("cloning repository %s: %w\n%s", repoName, err, output)
+			if isAuthRelated(string(output)) {
 				return "", &authError{err: fmt.Errorf("%w%s", cloneErr, authErrorGuidance)}
 			}
 			return "", cloneErr
@@ -168,7 +165,8 @@ func processRepository(ctx context.Context, repo *github.Repository, repoPath st
 }
 
 // worker processes repositories from jobs and sends results to the results channel.
-func worker(ctx context.Context, jobs <-chan *github.Repository, results chan<- repoResult, targetPath string, skipUpdate bool, verbose bool) {
+// absTargetPath must be the absolute path of the target directory (computed once by the caller).
+func worker(ctx context.Context, jobs <-chan *github.Repository, results chan<- repoResult, absTargetPath string, skipUpdate bool, verbose bool) {
 	for repo := range jobs {
 		select {
 		case <-ctx.Done():
@@ -188,28 +186,10 @@ func worker(ctx context.Context, jobs <-chan *github.Repository, results chan<- 
 			continue
 		}
 
-		repoPath := filepath.Join(targetPath, repoName)
+		absRepo := filepath.Join(absTargetPath, repoName)
 
 		// Verify the resolved path stays within targetPath
-		absTarget, err := filepath.Abs(targetPath)
-		if err != nil {
-			results <- repoResult{
-				repoName: repoName,
-				success:  false,
-				message:  fmt.Sprintf("resolving target path for %s: %v", repoName, err),
-			}
-			continue
-		}
-		absRepo, err := filepath.Abs(repoPath)
-		if err != nil {
-			results <- repoResult{
-				repoName: repoName,
-				success:  false,
-				message:  fmt.Sprintf("resolving repo path for %s: %v", repoName, err),
-			}
-			continue
-		}
-		if !strings.HasPrefix(absRepo+string(os.PathSeparator), absTarget+string(os.PathSeparator)) {
+		if !strings.HasPrefix(absRepo+string(os.PathSeparator), absTargetPath+string(os.PathSeparator)) {
 			results <- repoResult{
 				repoName: repoName,
 				success:  false,
@@ -285,6 +265,11 @@ func runRootCommand(ctx context.Context) error {
 		return fmt.Errorf("failed to create target directory: %w", err)
 	}
 
+	absTargetPath, err := filepath.Abs(targetPath)
+	if err != nil {
+		return fmt.Errorf("resolving target path: %w", err)
+	}
+
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		return fmt.Errorf("GITHUB_TOKEN not set: set it with: export GITHUB_TOKEN=\"your-personal-access-token\"")
@@ -322,7 +307,7 @@ func runRootCommand(ctx context.Context) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			worker(ctx, jobs, results, targetPath, skipUpdate, verbose)
+			worker(ctx, jobs, results, absTargetPath, skipUpdate, verbose)
 		}()
 	}
 
