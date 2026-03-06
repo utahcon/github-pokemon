@@ -38,13 +38,6 @@ var (
 
 const maxParallelLimit = 50
 
-// authErrorGuidance is the help text shown when an authentication error is detected.
-const authErrorGuidance = "\n\nAuthentication error detected. Please ensure:\n" +
-	"1. Your SSH key is set up correctly with GitHub: https://docs.github.com/en/authentication/connecting-to-github-with-ssh\n" +
-	"2. Your GITHUB_TOKEN has sufficient permissions\n" +
-	"3. For SSH: Your SSH agent is running ('eval $(ssh-agent -s)')\n" +
-	"4. For HTTPS: You may need to configure credential helper ('git config --global credential.helper cache')"
-
 // authError wraps an error to indicate it was caused by an authentication problem.
 type authError struct {
 	err error

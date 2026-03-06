@@ -122,14 +122,14 @@ func printGroupedResults(results []repoResult, verboseMode bool) {
 		icon := actionIcon(a)
 
 		for _, r := range group {
-			c.Printf("  %-10s %s", icon, r.repoName)
+			_, _ = c.Printf("  %-10s %s", icon, r.repoName)
 			if verboseMode && r.duration > 0 {
 				fmt.Printf("  (%s)", r.duration.Round(time.Millisecond))
 			}
 			fmt.Println()
 
 			if a == actionErrored && r.err != nil {
-				c.Printf("             %s\n", r.err.Error())
+				_, _ = c.Printf("             %s\n", r.err.Error())
 			}
 
 			if verboseMode && r.verboseDetail != "" {
@@ -154,15 +154,15 @@ func printSummary(results []repoResult, total int, elapsed time.Duration, org st
 	yellow := color.New(color.FgYellow)
 	red := color.New(color.FgRed)
 
-	green.Printf("  \u2713 Cloned:  %3d\n", counts[actionCloned])
-	green.Printf("  \u21bb Fetched: %3d\n", counts[actionFetched])
-	yellow.Printf("  \u2298 Skipped: %3d\n", counts[actionSkipped])
-	red.Printf("  \u2717 Errors:  %3d\n", counts[actionErrored])
+	_, _ = green.Printf("  \u2713 Cloned:  %3d\n", counts[actionCloned])
+	_, _ = green.Printf("  \u21bb Fetched: %3d\n", counts[actionFetched])
+	_, _ = yellow.Printf("  \u2298 Skipped: %3d\n", counts[actionSkipped])
+	_, _ = red.Printf("  \u2717 Errors:  %3d\n", counts[actionErrored])
 	fmt.Printf("Elapsed: %.1fs\n", elapsed.Seconds())
 
 	if hadAuth {
 		fmt.Println()
-		red.Println("Some authentication errors were detected. Please verify your setup:")
+		_, _ = red.Println("Some authentication errors were detected. Please verify your setup:")
 		fmt.Println("1. SSH setup guide: https://docs.github.com/en/authentication/connecting-to-github-with-ssh")
 		fmt.Println("2. Personal access token guide: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token")
 	}
