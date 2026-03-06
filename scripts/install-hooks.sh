@@ -44,6 +44,8 @@ ls -la "$HOOKS_DIR" | grep -v "total" | grep -v "^\." | awk '{print "  - " $9}'
 echo -e "\n${YELLOW}To test the pre-push hook, try pushing to main:${NC}"
 echo -e "  git push origin main\n"
 echo -e "${YELLOW}Note: You can bypass hooks with the --no-verify flag:${NC}"
-echo -e "  git push --no-verify origin main\n"
+echo -e "  git push --no-verify origin main"
+echo -e "  ${RED}WARNING: Only use --no-verify in emergencies. This skips important safety checks${NC}"
+echo -e "  ${RED}including version validation and branch protection enforcement.${NC}\n"
 
 exit 0
