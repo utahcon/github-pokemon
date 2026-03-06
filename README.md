@@ -1,4 +1,4 @@
-# GitHub Repository Manager (v1.0.2)
+# GitHub Repository Manager
 
 [![Build and Release](https://github.com/utahcon/github-pokemon/actions/workflows/release.yml/badge.svg)](https://github.com/utahcon/github-pokemon/actions/workflows/release.yml)
 
@@ -103,38 +103,6 @@ github-repo-manager --org "my-organization" --path "./repos" --verbose
 - **GitHub API**: Uses a personal access token via the `GITHUB_TOKEN` environment variable
 - **Git operations**: Uses SSH keys configured in your system
 
-### Version Management
-
-This project uses a flexible version management approach:
-
-- During development: Uses branch-based versions (e.g., `1.0.0-feature_branch`)
-- For releases: Uses Semantic Versioning (e.g., `1.0.0`)
-
-Version information is stored in a standalone `VERSION` file in the project root.
-
-#### Setting Development Versions
-
-To set a development version based on your branch name:
-
-```bash
-# Automatically create a version using current branch name
-./scripts/set-dev-version.sh
-
-# Specify a base version with branch suffix
-./scripts/set-dev-version.sh 1.2.0
-```
-
-#### Setting Release Versions
-
-When preparing a PR to main, update to a proper semantic version:
-
-```bash
-# Just edit the VERSION file directly
-echo "1.2.0" > VERSION
-
-# And update the CHANGELOG.md accordingly
-```
-
 ### Setting Up Authentication
 
 1. **GitHub Personal Access Token**:
@@ -207,14 +175,9 @@ If you encounter errors like "permission denied" or "authentication failed":
 
 The tool will automatically detect authentication issues and provide helpful guidance.
 
-#### Git Hook Issues
+### Update Notifications
 
-If you're having problems with Git hooks:
-
-1. Make sure the hooks are installed: `./scripts/install-hooks.sh`
-2. Check hook permissions: `ls -la .githooks/`
-3. You can bypass hooks temporarily with: `git push --no-verify`
-4. If hooks aren't triggering, verify Git configuration: `git config core.hooksPath`
+The tool automatically checks for newer releases on GitHub when it runs. If a newer version is available, a notice is printed to stderr at the end of the run. This check runs in the background with a 5-second timeout and never blocks the main operation.
 
 ## Contributing
 
@@ -222,91 +185,16 @@ Contributions are welcome! Please follow these steps:
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Install Git hooks (`./scripts/install-hooks.sh`)
-4. Set a development version (`./scripts/set-dev-version.sh`)
-5. Make your changes
-6. Update CHANGELOG.md with your changes
-7. Update to a proper release version when ready for a PR to main
-8. Run the version check (`./scripts/check-version.sh`)
-9. Commit your changes (`git commit -m 'Add some amazing feature'`)
-10. Push to the branch (`git push origin feature/amazing-feature`)
-11. Open a Pull Request
+3. Make your changes
+4. Commit using [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, etc.)
+5. Push to the branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
 
-The CI workflow will verify that your changes include a version increment and CHANGELOG update when targeting the main branch.
+### Releasing
 
-### Releasing and Version Management
+This project uses [release-please](https://github.com/googleapis/release-please) for automated versioning:
 
-This project uses GitHub Actions to automatically build and release binaries. See [CHANGELOG.md](CHANGELOG.md) for version history details.
-
-We follow [Semantic Versioning](https://semver.org/) for version numbers (MAJOR.MINOR.PATCH).
-
-#### Version Guardrails
-
-The main branch is protected and requires that PRs increment the version number:
-
-1. Any PR to main must contain a proper semantic version in the `VERSION` file
-2. The CHANGELOG.md must be updated with the new version
-3. A GitHub Actions workflow verifies these requirements on every PR to main
-4. During development, branch-based versions are allowed (e.g., `1.0.0-feature_branch`)
-
-#### Automatic Version Synchronization
-
-When changes are merged to main, a GitHub Actions workflow automatically:
-
-1. Extracts the current version from `cmd/root.go`
-2. Updates all version references in the documentation (README, CHANGELOG, etc.)
-3. Commits and pushes these synchronized changes back to the main branch
-
-You can also run version synchronization locally:
-
-```bash
-# Using the version from VERSION file
-./scripts/sync-versions.sh
-
-# Or specifying a version
-./scripts/sync-versions.sh 1.2.3
-```
-
-#### Git Hooks for Version Management
-
-This repository includes Git hooks to ensure version compliance before pushing:
-
-1. Install the hooks:
-   ```bash
-   ./scripts/install-hooks.sh
-   ```
-
-2. The pre-push hook will automatically:
-   - Detect when you're pushing to the main branch
-   - Check if version-related files were modified
-   - Run strict version checks only when pushing to main
-   - Allow development branch-based versions in other branches
-   - Block the push to main if semantic version rules aren't followed
-
-This helps catch version issues early, before even creating a PR.
-
-#### Creating a Release
-
-1. Create a feature branch:
-   ```bash
-   git checkout -b feature/my-feature
-   ```
-
-2. Update the VERSION file with a proper semantic version and update CHANGELOG.md
-
-3. Run the version check script to validate:
-   ```bash
-   ./scripts/check-version.sh
-   ```
-
-4. Open a PR to the main branch
-
-5. After merging to main, create and push a tag with the version number:
-   ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
-   ```
-
-6. The GitHub Action will automatically build binaries for all supported platforms and create a release.
-
-7. You can also manually trigger a build using the "workflow_dispatch" event in GitHub Actions.
+1. Commit messages must follow Conventional Commits
+2. On merge to `main`, release-please opens/updates a release PR with version bump and CHANGELOG
+3. When the release PR is merged, a Git tag is created
+4. The tag triggers GoReleaser to build cross-platform binaries and create a GitHub release

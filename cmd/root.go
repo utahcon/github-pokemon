@@ -247,6 +247,10 @@ func filterNonArchived(repos []*github.Repository) []*github.Repository {
 }
 
 func runRootCommand(ctx context.Context) error {
+	// Start update check in background (non-blocking, 5s timeout).
+	token := os.Getenv("GITHUB_TOKEN")
+	updateCh := checkForUpdate(ctx, token)
+	defer printUpdateNotice(updateCh)
 	if noColor {
 		color.NoColor = true
 	}
@@ -271,7 +275,6 @@ func runRootCommand(ctx context.Context) error {
 		return fmt.Errorf("resolving target path: %w", err)
 	}
 
-	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		return fmt.Errorf("GITHUB_TOKEN not set: set it with: export GITHUB_TOKEN=\"your-personal-access-token\"")
 	}
