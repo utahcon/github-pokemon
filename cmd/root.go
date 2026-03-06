@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"syscall"
@@ -15,10 +16,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Version information - set via ldflags at build time:
-//
-//	go build -ldflags="-X github.com/utahcon/github-pokemon/cmd.version=1.0.0"
-var version = "0.0.0-dev"
+// version is set via ldflags at build time (GoReleaser) or falls back to
+// the module version embedded by go install.
+var version = func() string {
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return strings.TrimPrefix(info.Main.Version, "v")
+	}
+	return "0.0.0-dev"
+}()
 
 var (
 	organization  string
