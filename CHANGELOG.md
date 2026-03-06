@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0](https://github.com/utahcon/github-pokemon/compare/v1.1.0...v1.2.0) (2026-03-06)
+
+
+### Features
+
+* improve CLI output with colored grouped results and progress bar ([1384885](https://github.com/utahcon/github-pokemon/commit/1384885cbcb82667019959bce19579edda1842cd))
+* improve CLI output with colored grouped results and progress bar ([9ff3564](https://github.com/utahcon/github-pokemon/commit/9ff35640cd271b96eb73904cf55c2a7c2b6de8b2))
+
+
+### Bug Fixes
+
+* resolve lint errors for errcheck and unused constant ([3b047b2](https://github.com/utahcon/github-pokemon/commit/3b047b20f869cc75953a562493b64688a7149856))
+
 ## [1.1.0](https://github.com/utahcon/github-pokemon/compare/v1.0.0...v1.1.0) (2026-03-06)
 
 
