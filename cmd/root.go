@@ -97,8 +97,8 @@ func init() {
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
 	rootCmd.Flags().IntVarP(&parallelLimit, "parallel", "j", 5, "Number of repositories to process in parallel")
 
-	rootCmd.MarkFlagRequired("org")
-	rootCmd.MarkFlagRequired("path")
+	_ = rootCmd.MarkFlagRequired("org")
+	_ = rootCmd.MarkFlagRequired("path")
 }
 
 // isAuthRelated returns true if the output contains authentication-related keywords.
