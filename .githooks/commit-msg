@@ -1,0 +1,33 @@
+#!/bin/bash
+# Validate that commit messages follow Conventional Commits format.
+# https://www.conventionalcommits.org/
+#
+# Install: git config core.hooksPath .githooks
+
+commit_msg_file="$1"
+commit_msg=$(head -1 "$commit_msg_file")
+
+# Allow merge commits and revert commits
+if echo "$commit_msg" | grep -qE '^(Merge|Revert) '; then
+  exit 0
+fi
+
+# Conventional commit pattern: type(optional scope): description
+pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9._-]+\))?(!)?: .+'
+
+if ! echo "$commit_msg" | grep -qE "$pattern"; then
+  echo "ERROR: Commit message does not follow Conventional Commits format."
+  echo ""
+  echo "  Expected: <type>[optional scope]: <description>"
+  echo ""
+  echo "  Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+  echo ""
+  echo "  Examples:"
+  echo "    feat: add user authentication"
+  echo "    fix(api): handle nil pointer in handler"
+  echo "    docs: update README with install instructions"
+  echo "    feat!: drop support for Go 1.21"
+  echo ""
+  echo "  Your message: $commit_msg"
+  exit 1
+fi
