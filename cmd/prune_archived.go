@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	pruneOrg  string
-	prunePath string
-	dryRun    bool
+	pruneOrg     string
+	prunePath    string
+	pruneConfirm bool
 )
 
 var pruneArchivedCmd = &cobra.Command{
@@ -23,8 +23,8 @@ var pruneArchivedCmd = &cobra.Command{
 Any directory that corresponds to an archived repository in the specified organization
 will be removed.
 
-By default runs in dry-run mode (--dry-run) so you can preview what would be deleted.
-Pass --dry-run=false to actually remove directories.`,
+By default runs in dry-run mode so you can preview what would be deleted.
+Pass --confirm to actually remove directories.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runPruneArchived(cmd.Context())
 	},
@@ -34,7 +34,7 @@ Pass --dry-run=false to actually remove directories.`,
 func init() {
 	pruneArchivedCmd.Flags().StringVarP(&pruneOrg, "org", "o", "", "GitHub organization to check repositories against (required)")
 	pruneArchivedCmd.Flags().StringVarP(&prunePath, "path", "p", "", "Local path containing cloned repositories (required)")
-	pruneArchivedCmd.Flags().BoolVar(&dryRun, "dry-run", true, "Preview what would be removed without deleting anything")
+	pruneArchivedCmd.Flags().BoolVar(&pruneConfirm, "confirm", false, "Actually remove directories (without this flag, runs in dry-run mode)")
 
 	_ = pruneArchivedCmd.MarkFlagRequired("org")
 	_ = pruneArchivedCmd.MarkFlagRequired("path")
@@ -87,7 +87,7 @@ func runPruneArchived(ctx context.Context) error {
 
 		dirPath := filepath.Join(absPath, name)
 
-		if dryRun {
+		if !pruneConfirm {
 			fmt.Printf("[dry-run] would remove: %s\n", dirPath)
 			removedCount++
 			continue
@@ -102,10 +102,10 @@ func runPruneArchived(ctx context.Context) error {
 		removedCount++
 	}
 
-	if dryRun {
+	if !pruneConfirm {
 		fmt.Printf("\nDry-run complete: %d archived repositories would be removed\n", removedCount)
 		if removedCount > 0 {
-			fmt.Println("Run with --dry-run=false to actually remove them")
+			fmt.Println("To actually remove them, re-run with the --confirm flag")
 		}
 	} else {
 		fmt.Printf("\nSummary: Removed %d archived repositories", removedCount)
