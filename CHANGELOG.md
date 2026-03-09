@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0](https://github.com/utahcon/github-pokemon/compare/v1.3.0...v1.4.0) (2026-03-09)
+
+
+### Features
+
+* add --include-archived flag and prune-archived subcommand ([e2e8a95](https://github.com/utahcon/github-pokemon/commit/e2e8a95db51eb92dc2259d2e23382e69418a61f0))
+* add --include-archived flag and prune-archived subcommand ([8effe3b](https://github.com/utahcon/github-pokemon/commit/8effe3bb62cac47bc3e9a8e2610c7a9d3cd4dfaf))
+
+
+### Bug Fixes
+
+* resolve merge conflict in result processing loop ([49ea017](https://github.com/utahcon/github-pokemon/commit/49ea017c1ee94dec864d8ba6305d20a567da03ae))
+
 ## [1.3.0](https://github.com/utahcon/github-pokemon/compare/v1.2.0...v1.3.0) (2026-03-06)
 
 
