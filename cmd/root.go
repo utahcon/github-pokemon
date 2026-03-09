@@ -339,42 +339,7 @@ func runRootCommand(ctx context.Context) error {
 		close(results)
 	}()
 
-	processedCount := 0
-	errorCount := 0
-	var authErrors bool
-
-	for result := range results {
-		processedCount++
-
-		fmt.Printf("[%d/%d] %s\n", processedCount, repoCount, result.message)
-
-		if !result.success {
-			errorCount++
-			if strings.Contains(result.message, "Authentication error detected") {
-				authErrors = true
-			}
-		}
-	}
-
-	fmt.Printf("\nSummary: Processed %d/%d repositories from organization %s\n",
-		processedCount, repoCount, organization)
-
-	if errorCount > 0 {
-		fmt.Printf("Encountered %d errors during processing\n", errorCount)
-
-		if authErrors {
-			fmt.Printf("\nSome authentication errors were detected. Please verify your setup:\n")
-			fmt.Printf("1. SSH setup guide: https://docs.github.com/en/authentication/connecting-to-github-with-ssh\n")
-			fmt.Printf("2. Personal access token guide: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token\n")
-		}
-	} else {
-		fmt.Printf("All repositories processed successfully\n")
-	}
-
-	fmt.Printf("\nNote: For existing repositories, only 'git fetch --all' was performed.\n")
-	fmt.Printf("Local branches were not modified. Use 'git merge' or 'git rebase' manually to update local branches.\n")
-
-  errorCount, _ := collectAndDisplay(results, nonArchivedCount, verbose, startTime)
+	errorCount, _ := collectAndDisplay(results, repoCount, verbose, startTime)
 
 	if errorCount > 0 {
 		return fmt.Errorf("failed to process %d repositories", errorCount)
