@@ -26,11 +26,12 @@ var version = func() string {
 }()
 
 var (
-	organization  string
-	targetPath    string
-	skipUpdate    bool
-	verbose       bool
-	parallelLimit int
+	organization    string
+	targetPath      string
+	skipUpdate      bool
+	verbose         bool
+	parallelLimit   int
+	includeArchived bool
 )
 
 const maxParallelLimit = 50
@@ -63,7 +64,7 @@ var rootCmd = &cobra.Command{
 	Short: "Clone non-archived repositories for a GitHub organization",
 	Long: `This tool fetches all non-archived repositories for a specified GitHub organization
 and either clones them (if they don't exist locally) or fetches remote updates (if they do exist)
-to a specified local path.
+to a specified local path. Use --include-archived to also process archived repositories.
 
 The tool will never modify local branches - it only fetches remote tracking information
 for existing repositories.
@@ -96,6 +97,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&skipUpdate, "skip-update", "s", false, "Skip updating existing repositories")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
 	rootCmd.Flags().IntVarP(&parallelLimit, "parallel", "j", 5, "Number of repositories to process in parallel")
+	rootCmd.Flags().BoolVar(&includeArchived, "include-archived", false, "Include archived repositories")
 
 	_ = rootCmd.MarkFlagRequired("org")
 	_ = rootCmd.MarkFlagRequired("path")
@@ -291,21 +293,31 @@ func runRootCommand(ctx context.Context) error {
 		return err
 	}
 
-	nonArchivedRepos := filterNonArchived(allRepos)
-	nonArchivedCount := len(nonArchivedRepos)
+	var repos []*github.Repository
+	if includeArchived {
+		repos = allRepos
+	} else {
+		repos = filterNonArchived(allRepos)
+	}
+	repoCount := len(repos)
 
+	nonArchivedCount := len(filterNonArchived(allRepos))
 	fmt.Printf("Found %d repositories in organization %s (%d non-archived)\n",
 		len(allRepos), organization, nonArchivedCount)
 
-	if nonArchivedCount == 0 {
-		fmt.Println("No non-archived repositories found. Nothing to process.")
+	if includeArchived {
+		fmt.Printf("Including archived repositories (--include-archived)\n")
+	}
+
+	if repoCount == 0 {
+		fmt.Println("No repositories found. Nothing to process.")
 		return nil
 	}
 
-	fmt.Printf("Processing repositories with %d parallel workers\n", parallelLimit)
+	fmt.Printf("Processing %d repositories with %d parallel workers\n", repoCount, parallelLimit)
 
-	jobs := make(chan *github.Repository, nonArchivedCount)
-	results := make(chan repoResult, nonArchivedCount)
+	jobs := make(chan *github.Repository, repoCount)
+	results := make(chan repoResult, repoCount)
 
 	var wg sync.WaitGroup
 	for w := 0; w < parallelLimit; w++ {
@@ -316,7 +328,7 @@ func runRootCommand(ctx context.Context) error {
 		}()
 	}
 
-	for _, repo := range nonArchivedRepos {
+	for _, repo := range repos {
 		jobs <- repo
 	}
 	close(jobs)
@@ -333,7 +345,7 @@ func runRootCommand(ctx context.Context) error {
 	for result := range results {
 		processedCount++
 
-		fmt.Printf("[%d/%d] %s\n", processedCount, nonArchivedCount, result.message)
+		fmt.Printf("[%d/%d] %s\n", processedCount, repoCount, result.message)
 
 		if !result.success {
 			errorCount++
@@ -343,8 +355,8 @@ func runRootCommand(ctx context.Context) error {
 		}
 	}
 
-	fmt.Printf("\nSummary: Processed %d/%d non-archived repositories from organization %s\n",
-		processedCount, nonArchivedCount, organization)
+	fmt.Printf("\nSummary: Processed %d/%d repositories from organization %s\n",
+		processedCount, repoCount, organization)
 
 	if errorCount > 0 {
 		fmt.Printf("Encountered %d errors during processing\n", errorCount)
