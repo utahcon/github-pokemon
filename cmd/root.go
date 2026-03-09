@@ -11,7 +11,9 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
+	"github.com/fatih/color"
 	"github.com/google/go-github/v84/github"
 	"github.com/spf13/cobra"
 )
@@ -32,16 +34,10 @@ var (
 	verbose         bool
 	parallelLimit   int
 	includeArchived bool
+	noColor       bool
 )
 
 const maxParallelLimit = 50
-
-// authErrorGuidance is the help text shown when an authentication error is detected.
-const authErrorGuidance = "\n\nAuthentication error detected. Please ensure:\n" +
-	"1. Your SSH key is set up correctly with GitHub: https://docs.github.com/en/authentication/connecting-to-github-with-ssh\n" +
-	"2. Your GITHUB_TOKEN has sufficient permissions\n" +
-	"3. For SSH: Your SSH agent is running ('eval $(ssh-agent -s)')\n" +
-	"4. For HTTPS: You may need to configure credential helper ('git config --global credential.helper cache')"
 
 // authError wraps an error to indicate it was caused by an authentication problem.
 type authError struct {
@@ -53,9 +49,11 @@ func (e *authError) Unwrap() error { return e.err }
 
 // repoResult holds the outcome of processing a single repository.
 type repoResult struct {
-	repoName string
-	success  bool
-	message  string
+	repoName      string
+	action        repoAction
+	err           error
+	duration      time.Duration
+	verboseDetail string
 }
 
 // rootCmd represents the base command when called without any subcommands
@@ -99,6 +97,8 @@ func init() {
 	rootCmd.Flags().IntVarP(&parallelLimit, "parallel", "j", 5, "Number of repositories to process in parallel")
 	rootCmd.Flags().BoolVar(&includeArchived, "include-archived", false, "Include archived repositories")
 
+	rootCmd.Flags().BoolVar(&noColor, "no-color", false, "Disable colored output")
+
 	_ = rootCmd.MarkFlagRequired("org")
 	_ = rootCmd.MarkFlagRequired("path")
 }
@@ -113,9 +113,8 @@ func isAuthRelated(output string) bool {
 }
 
 // processRepository handles cloning or fetching for a single repository.
-// On success it returns a descriptive message and nil error.
-// On failure it returns an empty string and an error (possibly an *authError).
-func processRepository(ctx context.Context, repo *github.Repository, repoPath string, skipUpdate bool, verbose bool) (string, error) {
+// It returns the action taken, an optional verbose detail string, and an error.
+func processRepository(ctx context.Context, repo *github.Repository, repoPath string, skipUpdate bool, verboseMode bool) (repoAction, string, error) {
 	repoName := repo.GetName()
 
 	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
@@ -130,19 +129,16 @@ func processRepository(ctx context.Context, repo *github.Repository, repoPath st
 		if err != nil {
 			cloneErr := fmt.Errorf("cloning repository %s: %w\n%s", repoName, err, output)
 			if isAuthRelated(string(output)) {
-				return "", &authError{err: fmt.Errorf("%w%s", cloneErr, authErrorGuidance)}
+				return actionErrored, "", &authError{err: cloneErr}
 			}
-			return "", cloneErr
+			return actionErrored, "", cloneErr
 		}
 
-		return fmt.Sprintf("successfully cloned repository: %s", repoName), nil
+		return actionCloned, "", nil
 	}
 
 	if skipUpdate {
-		if verbose {
-			return fmt.Sprintf("skipping update for existing repository: %s", repoName), nil
-		}
-		return fmt.Sprintf("repository exists (skipping): %s", repoName), nil
+		return actionSkipped, "", nil
 	}
 
 	fetchCmd := exec.CommandContext(ctx, "git", "fetch", "--all")
@@ -152,28 +148,27 @@ func processRepository(ctx context.Context, repo *github.Repository, repoPath st
 	if err != nil {
 		fetchErr := fmt.Errorf("fetching repository %s: %w\n%s", repoName, err, fetchOutput)
 		if isAuthRelated(string(fetchOutput)) {
-			return "", &authError{err: fmt.Errorf("%w%s", fetchErr, authErrorGuidance)}
+			return actionErrored, "", &authError{err: fetchErr}
 		}
-		return "", fetchErr
+		return actionErrored, "", fetchErr
 	}
 
-	successMsg := fmt.Sprintf("successfully fetched updates for %s", repoName)
-
-	if verbose {
+	var detail string
+	if verboseMode {
 		statusCmd := exec.CommandContext(ctx, "git", "status", "-sb")
 		statusCmd.Dir = repoPath
 		statusOutput, err := statusCmd.CombinedOutput()
 		if err == nil {
-			successMsg += fmt.Sprintf("\nStatus for %s:\n%s", repoName, statusOutput)
+			detail = strings.TrimSpace(string(statusOutput))
 		}
 	}
 
-	return successMsg, nil
+	return actionFetched, detail, nil
 }
 
 // worker processes repositories from jobs and sends results to the results channel.
 // absTargetPath must be the absolute path of the target directory (computed once by the caller).
-func worker(ctx context.Context, jobs <-chan *github.Repository, results chan<- repoResult, absTargetPath string, skipUpdate bool, verbose bool) {
+func worker(ctx context.Context, jobs <-chan *github.Repository, results chan<- repoResult, absTargetPath string, skipUpdate bool, verboseMode bool) {
 	for repo := range jobs {
 		select {
 		case <-ctx.Done():
@@ -187,8 +182,8 @@ func worker(ctx context.Context, jobs <-chan *github.Repository, results chan<- 
 		if repoName == ".." || strings.ContainsAny(repoName, `/\`) {
 			results <- repoResult{
 				repoName: repoName,
-				success:  false,
-				message:  fmt.Sprintf("skipping repository %q: name contains invalid path characters", repoName),
+				action:   actionErrored,
+				err:      fmt.Errorf("skipping repository %q: name contains invalid path characters", repoName),
 			}
 			continue
 		}
@@ -199,25 +194,22 @@ func worker(ctx context.Context, jobs <-chan *github.Repository, results chan<- 
 		if !strings.HasPrefix(absRepo+string(os.PathSeparator), absTargetPath+string(os.PathSeparator)) {
 			results <- repoResult{
 				repoName: repoName,
-				success:  false,
-				message:  fmt.Sprintf("skipping repository %q: resolved path escapes target directory", repoName),
+				action:   actionErrored,
+				err:      fmt.Errorf("skipping repository %q: resolved path escapes target directory", repoName),
 			}
 			continue
 		}
 
-		msg, err := processRepository(ctx, repo, absRepo, skipUpdate, verbose)
-		if err != nil {
-			results <- repoResult{
-				repoName: repoName,
-				success:  false,
-				message:  err.Error(),
-			}
-		} else {
-			results <- repoResult{
-				repoName: repoName,
-				success:  true,
-				message:  msg,
-			}
+		start := time.Now()
+		action, detail, err := processRepository(ctx, repo, absRepo, skipUpdate, verboseMode)
+		elapsed := time.Since(start)
+
+		results <- repoResult{
+			repoName:      repoName,
+			action:        action,
+			err:           err,
+			duration:      elapsed,
+			verboseDetail: detail,
 		}
 	}
 }
@@ -257,6 +249,14 @@ func filterNonArchived(repos []*github.Repository) []*github.Repository {
 }
 
 func runRootCommand(ctx context.Context) error {
+	// Start update check in background (non-blocking, 5s timeout).
+	token := os.Getenv("GITHUB_TOKEN")
+	updateCh := checkForUpdate(ctx, token)
+	defer printUpdateNotice(updateCh)
+	if noColor {
+		color.NoColor = true
+	}
+
 	if parallelLimit <= 0 {
 		parallelLimit = 5
 	}
@@ -277,7 +277,6 @@ func runRootCommand(ctx context.Context) error {
 		return fmt.Errorf("resolving target path: %w", err)
 	}
 
-	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		return fmt.Errorf("GITHUB_TOKEN not set: set it with: export GITHUB_TOKEN=\"your-personal-access-token\"")
 	}
@@ -287,6 +286,8 @@ func runRootCommand(ctx context.Context) error {
 	}
 
 	client := github.NewClient(nil).WithAuthToken(token)
+
+	startTime := time.Now()
 
 	allRepos, err := fetchOrgRepos(ctx, client, organization)
 	if err != nil {
@@ -314,7 +315,7 @@ func runRootCommand(ctx context.Context) error {
 		return nil
 	}
 
-	fmt.Printf("Processing %d repositories with %d parallel workers\n", repoCount, parallelLimit)
+	fmt.Printf("Processing repositories with %d parallel workers\n\n", parallelLimit)
 
 	jobs := make(chan *github.Repository, repoCount)
 	results := make(chan repoResult, repoCount)
@@ -372,6 +373,8 @@ func runRootCommand(ctx context.Context) error {
 
 	fmt.Printf("\nNote: For existing repositories, only 'git fetch --all' was performed.\n")
 	fmt.Printf("Local branches were not modified. Use 'git merge' or 'git rebase' manually to update local branches.\n")
+
+  errorCount, _ := collectAndDisplay(results, nonArchivedCount, verbose, startTime)
 
 	if errorCount > 0 {
 		return fmt.Errorf("failed to process %d repositories", errorCount)

@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0](https://github.com/utahcon/github-pokemon/compare/v1.2.0...v1.3.0) (2026-03-06)
+
+
+### Features
+
+* add automatic update check and clean up README ([d918375](https://github.com/utahcon/github-pokemon/commit/d918375303c21a41975190c865b33f3e81d265a9))
+* add automatic update check and clean up stale README sections ([9ddae99](https://github.com/utahcon/github-pokemon/commit/9ddae992185c24d569d70281fb1f15c3fea41f05))
+
+## [1.2.0](https://github.com/utahcon/github-pokemon/compare/v1.1.0...v1.2.0) (2026-03-06)
+
+
+### Features
+
+* improve CLI output with colored grouped results and progress bar ([1384885](https://github.com/utahcon/github-pokemon/commit/1384885cbcb82667019959bce19579edda1842cd))
+* improve CLI output with colored grouped results and progress bar ([9ff3564](https://github.com/utahcon/github-pokemon/commit/9ff35640cd271b96eb73904cf55c2a7c2b6de8b2))
+
+
+### Bug Fixes
+
+* resolve lint errors for errcheck and unused constant ([3b047b2](https://github.com/utahcon/github-pokemon/commit/3b047b20f869cc75953a562493b64688a7149856))
+
 ## [1.1.0](https://github.com/utahcon/github-pokemon/compare/v1.0.0...v1.1.0) (2026-03-06)
 
 
