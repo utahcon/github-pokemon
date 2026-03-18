@@ -268,7 +268,29 @@ func runRoot(cmd *cobra.Command) error {
 
 	// If --org and --path are provided, run in single-org mode (backward compatible).
 	if organization != "" && targetPath != "" {
-		return runRootCommand(ctx, organization, targetPath)
+		if err := runRootCommand(ctx, organization, targetPath); err != nil {
+			return err
+		}
+
+		// Offer to save this org/path to config for future use.
+		cfgFile := configPath
+		if cfgFile == "" {
+			if p, err := defaultConfigPath(); err == nil {
+				cfgFile = p
+			}
+		}
+		if cfgFile != "" {
+			cfg, _ := loadOrCreateConfig(cfgFile)
+			absPath, _ := filepath.Abs(targetPath)
+			if absPath == "" {
+				absPath = targetPath
+			}
+			if !configHasOrg(cfg, organization, absPath) {
+				promptToSaveConfig(organization, absPath, cfgFile)
+			}
+		}
+
+		return nil
 	}
 
 	// If only one of --org/--path is set, that's an error.
