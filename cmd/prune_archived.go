@@ -26,7 +26,7 @@ will be removed.
 By default runs in dry-run mode so you can preview what would be deleted.
 Pass --confirm to actually remove directories.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runPruneArchived(cmd.Context())
+		return runPruneRoot(cmd)
 	},
 	SilenceUsage: true,
 }
@@ -36,19 +36,64 @@ func init() {
 	pruneArchivedCmd.Flags().StringVarP(&prunePath, "path", "p", "", "Local path containing cloned repositories (required)")
 	pruneArchivedCmd.Flags().BoolVar(&pruneConfirm, "confirm", false, "Actually remove directories (without this flag, runs in dry-run mode)")
 
-	_ = pruneArchivedCmd.MarkFlagRequired("org")
-	_ = pruneArchivedCmd.MarkFlagRequired("path")
-
 	rootCmd.AddCommand(pruneArchivedCmd)
 }
 
-func runPruneArchived(ctx context.Context) error {
+// runPruneRoot decides whether to use CLI flags (single org) or the config file (multi-org).
+func runPruneRoot(cmd *cobra.Command) error {
+	ctx := cmd.Context()
+
+	if pruneOrg != "" && prunePath != "" {
+		return runPruneArchived(ctx, pruneOrg, prunePath)
+	}
+
+	if pruneOrg != "" || prunePath != "" {
+		return fmt.Errorf("both --org and --path are required when not using a config file")
+	}
+
+	cfgFile := configPath
+	if cfgFile == "" {
+		var err error
+		cfgFile, err = defaultConfigPath()
+		if err != nil {
+			return fmt.Errorf("no --org/--path flags provided and %w", err)
+		}
+	}
+
+	cfg, err := loadConfig(cfgFile)
+	if err != nil {
+		return fmt.Errorf("no --org/--path flags provided and config file unavailable: %w", err)
+	}
+
+	fmt.Printf("Loaded config with %d org(s) from %s\n\n", len(cfg.Orgs), cfgFile)
+
+	var firstErr error
+	for i, entry := range cfg.Orgs {
+		if i > 0 {
+			fmt.Println("---")
+			fmt.Println()
+		}
+
+		fmt.Printf("Pruning archived repos for org: %s in %s\n\n", entry.Org, entry.Path)
+
+		if err := runPruneArchived(ctx, entry.Org, entry.Path); err != nil {
+			fmt.Printf("Error pruning org %s: %v\n", entry.Org, err)
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
+
+	return firstErr
+}
+
+func runPruneArchived(ctx context.Context, org string, path string) error {
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		return fmt.Errorf("GITHUB_TOKEN not set: set it with: export GITHUB_TOKEN=\"your-personal-access-token\"")
 	}
 
-	absPath, err := filepath.Abs(prunePath)
+	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return fmt.Errorf("resolving target path: %w", err)
 	}
@@ -60,9 +105,9 @@ func runPruneArchived(ctx context.Context) error {
 
 	client := github.NewClient(nil).WithAuthToken(token)
 
-	allRepos, err := fetchOrgRepos(ctx, client, pruneOrg)
+	allRepos, err := fetchOrgRepos(ctx, client, org)
 	if err != nil {
-		return err
+		return fmt.Errorf("fetching repos for org %s: %w", org, err)
 	}
 
 	archivedSet := make(map[string]bool)
@@ -113,6 +158,10 @@ func runPruneArchived(ctx context.Context) error {
 			fmt.Printf(" (%d failed)", skippedCount)
 		}
 		fmt.Println()
+	}
+
+	if skippedCount > 0 {
+		return fmt.Errorf("failed to remove %d archived repositories", skippedCount)
 	}
 
 	return nil

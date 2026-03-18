@@ -49,7 +49,7 @@ func actionColor(a repoAction) *color.Color {
 	}
 }
 
-func collectAndDisplay(resultsCh <-chan repoResult, total int, verboseMode bool, startTime time.Time) (int, bool) {
+func collectAndDisplay(resultsCh <-chan repoResult, total int, verboseMode bool, startTime time.Time, org string) (int, bool) {
 	bar := progressbar.NewOptions(total,
 		progressbar.OptionSetWriter(os.Stderr),
 		progressbar.OptionSetDescription("Processing repos"),
@@ -79,7 +79,7 @@ func collectAndDisplay(resultsCh <-chan repoResult, total int, verboseMode bool,
 	}
 
 	printGroupedResults(results, verboseMode)
-	printSummary(results, total, time.Since(startTime), organization, hadAuth)
+	printSummary(results, total, time.Since(startTime), org, hadAuth)
 
 	return errorCount, hadAuth
 }

@@ -34,7 +34,8 @@ var (
 	verbose         bool
 	parallelLimit   int
 	includeArchived bool
-	noColor       bool
+	noColor         bool
+	configPath      string
 )
 
 const maxParallelLimit = 50
@@ -67,10 +68,21 @@ to a specified local path. Use --include-archived to also process archived repos
 The tool will never modify local branches - it only fetches remote tracking information
 for existing repositories.
 
+You can specify --org and --path flags for a single organization, or omit them to use a
+config file (~/.config/github-pokemon/config.yaml) that supports multiple organizations:
+
+  orgs:
+    - org: "my-org"
+      path: "/home/user/repos/my-org"
+    - org: "other-org"
+      path: "/home/user/repos/other-org"
+  parallel: 10
+  verbose: true
+
 GitHub API credentials are expected to be in environment variables:
 - GITHUB_TOKEN: Personal access token for GitHub API`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runRootCommand(cmd.Context())
+		return runRoot(cmd)
 	},
 	SilenceUsage: true,
 }
@@ -98,9 +110,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&includeArchived, "include-archived", false, "Include archived repositories")
 
 	rootCmd.Flags().BoolVar(&noColor, "no-color", false, "Disable colored output")
-
-	_ = rootCmd.MarkFlagRequired("org")
-	_ = rootCmd.MarkFlagRequired("path")
+	rootCmd.Flags().StringVar(&configPath, "config", "", "Path to config file (default: ~/.config/github-pokemon/config.yaml)")
 }
 
 // isAuthRelated returns true if the output contains authentication-related keywords.
@@ -248,31 +258,101 @@ func filterNonArchived(repos []*github.Repository) []*github.Repository {
 	return result
 }
 
-func runRootCommand(ctx context.Context) error {
-	// Start update check in background (non-blocking, 5s timeout).
-	token := os.Getenv("GITHUB_TOKEN")
-	updateCh := checkForUpdate(ctx, token)
-	defer printUpdateNotice(updateCh)
+// runRoot decides whether to use CLI flags (single org) or the config file (multi-org).
+func runRoot(cmd *cobra.Command) error {
+	ctx := cmd.Context()
+
 	if noColor {
 		color.NoColor = true
 	}
 
-	if parallelLimit <= 0 {
-		parallelLimit = 5
+	// If --org and --path are provided, run in single-org mode (backward compatible).
+	if organization != "" && targetPath != "" {
+		return runRootCommand(ctx, organization, targetPath)
 	}
-	if parallelLimit > maxParallelLimit {
-		return fmt.Errorf("parallel limit %d exceeds maximum of %d", parallelLimit, maxParallelLimit)
+
+	// If only one of --org/--path is set, that's an error.
+	if organization != "" || targetPath != "" {
+		return fmt.Errorf("both --org and --path are required when not using a config file")
+	}
+
+	// Load config file.
+	cfgFile := configPath
+	if cfgFile == "" {
+		var err error
+		cfgFile, err = defaultConfigPath()
+		if err != nil {
+			return fmt.Errorf("no --org/--path flags provided and %w", err)
+		}
+	}
+
+	cfg, err := loadConfig(cfgFile)
+	if err != nil {
+		return fmt.Errorf("no --org/--path flags provided and config file unavailable: %w", err)
+	}
+
+	// Apply config defaults for flags that weren't explicitly set.
+	if !cmd.Flags().Changed("parallel") && cfg.Parallel > 0 {
+		parallelLimit = cfg.Parallel
+	}
+	if !cmd.Flags().Changed("skip-update") && cfg.SkipUpdate {
+		skipUpdate = true
+	}
+	if !cmd.Flags().Changed("verbose") && cfg.Verbose {
+		verbose = true
+	}
+	if !cmd.Flags().Changed("include-archived") && cfg.IncludeArchived {
+		includeArchived = true
+	}
+	if !cmd.Flags().Changed("no-color") && cfg.NoColor {
+		noColor = true
+	}
+
+	fmt.Printf("Loaded config with %d org(s) from %s\n\n", len(cfg.Orgs), cfgFile)
+
+	var firstErr error
+	for i, entry := range cfg.Orgs {
+		if i > 0 {
+			fmt.Println("---")
+			fmt.Println()
+		}
+
+		fmt.Printf("Processing org: %s -> %s\n\n", entry.Org, entry.Path)
+
+		if err := runRootCommand(ctx, entry.Org, entry.Path); err != nil {
+			fmt.Printf("Error processing org %s: %v\n", entry.Org, err)
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
+
+	return firstErr
+}
+
+func runRootCommand(ctx context.Context, org string, path string) error {
+	// Start update check in background (non-blocking, 5s timeout).
+	token := os.Getenv("GITHUB_TOKEN")
+	updateCh := checkForUpdate(ctx, token)
+	defer printUpdateNotice(updateCh)
+
+	parallel := parallelLimit
+	if parallel <= 0 {
+		parallel = 5
+	}
+	if parallel > maxParallelLimit {
+		return fmt.Errorf("parallel limit %d exceeds maximum of %d", parallel, maxParallelLimit)
 	}
 
 	if _, err := exec.LookPath("git"); err != nil {
 		return fmt.Errorf("git is not installed or not in PATH: %w", err)
 	}
 
-	if err := os.MkdirAll(targetPath, 0755); err != nil {
+	if err := os.MkdirAll(path, 0755); err != nil {
 		return fmt.Errorf("failed to create target directory: %w", err)
 	}
 
-	absTargetPath, err := filepath.Abs(targetPath)
+	absTargetPath, err := filepath.Abs(path)
 	if err != nil {
 		return fmt.Errorf("resolving target path: %w", err)
 	}
@@ -289,9 +369,9 @@ func runRootCommand(ctx context.Context) error {
 
 	startTime := time.Now()
 
-	allRepos, err := fetchOrgRepos(ctx, client, organization)
+	allRepos, err := fetchOrgRepos(ctx, client, org)
 	if err != nil {
-		return err
+		return fmt.Errorf("fetching repos for org %s: %w", org, err)
 	}
 
 	var repos []*github.Repository
@@ -304,7 +384,7 @@ func runRootCommand(ctx context.Context) error {
 
 	nonArchivedCount := len(filterNonArchived(allRepos))
 	fmt.Printf("Found %d repositories in organization %s (%d non-archived)\n",
-		len(allRepos), organization, nonArchivedCount)
+		len(allRepos), org, nonArchivedCount)
 
 	if includeArchived {
 		fmt.Printf("Including archived repositories (--include-archived)\n")
@@ -315,13 +395,13 @@ func runRootCommand(ctx context.Context) error {
 		return nil
 	}
 
-	fmt.Printf("Processing repositories with %d parallel workers\n\n", parallelLimit)
+	fmt.Printf("Processing repositories with %d parallel workers\n\n", parallel)
 
 	jobs := make(chan *github.Repository, repoCount)
 	results := make(chan repoResult, repoCount)
 
 	var wg sync.WaitGroup
-	for w := 0; w < parallelLimit; w++ {
+	for w := 0; w < parallel; w++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -339,7 +419,7 @@ func runRootCommand(ctx context.Context) error {
 		close(results)
 	}()
 
-	errorCount, _ := collectAndDisplay(results, repoCount, verbose, startTime)
+	errorCount, _ := collectAndDisplay(results, repoCount, verbose, startTime, org)
 
 	if errorCount > 0 {
 		return fmt.Errorf("failed to process %d repositories", errorCount)
