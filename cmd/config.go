@@ -112,6 +112,16 @@ func configHasOrg(cfg Config, org, path string) bool {
 	return false
 }
 
+// configLookupOrg returns the first matching OrgConfig for the given org name, or false if not found.
+func configLookupOrg(cfg Config, org string) (OrgConfig, bool) {
+	for _, entry := range cfg.Orgs {
+		if entry.Org == org {
+			return entry, true
+		}
+	}
+	return OrgConfig{}, false
+}
+
 // promptToSaveConfig asks the user if they want to save the org/path to the config file.
 // Returns true if the entry was saved.
 func promptToSaveConfig(org, path, cfgPath string) bool {

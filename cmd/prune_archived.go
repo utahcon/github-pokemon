@@ -47,10 +47,33 @@ func runPruneRoot(cmd *cobra.Command) error {
 		return runPruneArchived(ctx, pruneOrg, prunePath)
 	}
 
-	if pruneOrg != "" || prunePath != "" {
-		return fmt.Errorf("both --org and --path are required when not using a config file")
+	// If --org is set without --path, look it up in the config.
+	if pruneOrg != "" && prunePath == "" {
+		cfgFile := configPath
+		if cfgFile == "" {
+			var err error
+			cfgFile, err = defaultConfigPath()
+			if err != nil {
+				return fmt.Errorf("--path is required when no config file is available: %w", err)
+			}
+		}
+		cfg, err := loadOrCreateConfig(cfgFile)
+		if err != nil {
+			return fmt.Errorf("--path is required: could not load config: %w", err)
+		}
+		entry, found := configLookupOrg(cfg, pruneOrg)
+		if !found {
+			return fmt.Errorf("org %q not found in config file %s; provide --path explicitly", pruneOrg, cfgFile)
+		}
+		return runPruneArchived(ctx, entry.Org, entry.Path)
 	}
 
+	// --path without --org doesn't make sense.
+	if prunePath != "" {
+		return fmt.Errorf("--org is required when --path is provided")
+	}
+
+	// No flags — load config file and run all orgs.
 	cfgFile := configPath
 	if cfgFile == "" {
 		var err error

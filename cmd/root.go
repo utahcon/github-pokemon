@@ -293,12 +293,33 @@ func runRoot(cmd *cobra.Command) error {
 		return nil
 	}
 
-	// If only one of --org/--path is set, that's an error.
-	if organization != "" || targetPath != "" {
-		return fmt.Errorf("both --org and --path are required when not using a config file")
+	// If --org is set without --path, look it up in the config.
+	if organization != "" && targetPath == "" {
+		cfgFile := configPath
+		if cfgFile == "" {
+			var err error
+			cfgFile, err = defaultConfigPath()
+			if err != nil {
+				return fmt.Errorf("--path is required when no config file is available: %w", err)
+			}
+		}
+		cfg, err := loadOrCreateConfig(cfgFile)
+		if err != nil {
+			return fmt.Errorf("--path is required: could not load config: %w", err)
+		}
+		entry, found := configLookupOrg(cfg, organization)
+		if !found {
+			return fmt.Errorf("org %q not found in config file %s; provide --path explicitly", organization, cfgFile)
+		}
+		return runRootCommand(ctx, entry.Org, entry.Path)
 	}
 
-	// Load config file.
+	// --path without --org doesn't make sense.
+	if targetPath != "" {
+		return fmt.Errorf("--org is required when --path is provided")
+	}
+
+	// No flags — load config file and run all orgs.
 	cfgFile := configPath
 	if cfgFile == "" {
 		var err error
