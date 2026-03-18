@@ -48,4 +48,5 @@ release:
     name: github-pokemon
   draft: false
   prerelease: auto
+  mode: append
   name_template: "v{{ .Version }}"
