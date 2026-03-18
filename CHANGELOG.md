@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0](https://github.com/utahcon/github-pokemon/compare/v1.4.1...v1.5.0) (2026-03-18)
+
+
+### Features
+
+* config file support, multi-org, and CI release fix ([#14](https://github.com/utahcon/github-pokemon/issues/14)) ([2a7451d](https://github.com/utahcon/github-pokemon/commit/2a7451d209b0f5735125ddfd027cd73e40f3da36))
+
 ## [1.4.1](https://github.com/utahcon/github-pokemon/compare/v1.4.0...v1.4.1) (2026-03-09)
 
 
