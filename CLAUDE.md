@@ -24,10 +24,14 @@ There are no tests currently in this project.
 
 ## Architecture
 
-Single-command Cobra CLI app. All logic lives in two files:
+Single-command Cobra CLI app with a `prune-archived` subcommand:
 
 - `main.go` — entrypoint, calls `cmd.Execute()`
 - `cmd/root.go` — CLI flags, GitHub API pagination, worker pool for parallel clone/fetch
+- `cmd/config.go` — YAML config file loading (`~/.config/github-pokemon/config.yaml`)
+- `cmd/prune_archived.go` — subcommand to remove locally-cloned archived repos
+- `cmd/output.go` — progress bar and grouped result display
+- `cmd/update.go` — background self-update check
 
 The worker pool pattern: `runRootCommand()` creates a buffered channel of repos, spawns `--parallel` (default 5) goroutines via `worker()`, each calling `processRepository()` which either `git clone` or `git fetch --all`.
 

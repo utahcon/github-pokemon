@@ -9,6 +9,8 @@ A Go tool for efficiently managing multiple GitHub repositories from an organiza
 - Quickly clone all non-archived repositories from a GitHub organization
 - Update existing repositories by fetching remote tracking branches
 - Process repositories in parallel for better performance
+- **Config file support** — define multiple org/path pairs and run with no arguments
+- **Prune archived repos** — remove local directories for repositories archived on GitHub
 - SSH key support for authentication
 - Safe operations - never modifies local working directories
 
@@ -43,10 +45,10 @@ git clone https://github.com/utahcon/github-pokemon.git
 cd github-pokemon
 
 # Build the binary
-go build -o github-repo-manager
+go build -o github-pokemon
 
 # Optionally move to your path
-mv github-repo-manager /usr/local/bin/
+mv github-pokemon /usr/local/bin/
 ```
 
 ## Usage
@@ -56,47 +58,106 @@ mv github-repo-manager /usr/local/bin/
 export GITHUB_TOKEN="your-github-personal-access-token"
 
 # Basic usage with required parameters
-github-repo-manager --org "organization-name" --path "/path/to/store/repos"
+github-pokemon --org "organization-name" --path "/path/to/store/repos"
+
+# Run using a config file (no flags needed)
+github-pokemon
 
 # Check version
-github-repo-manager --version
-
-# The tool will automatically check if git is installed and if GITHUB_TOKEN is set
+github-pokemon --version
 ```
 
 ### Command Line Options
 
 ```
 Flags:
-  -h, --help           Display help information
-  -o, --org string     GitHub organization to fetch repositories from (required)
-  -j, --parallel int   Number of repositories to process in parallel (default 5)
-  -p, --path string    Local path to clone/update repositories to (required)
-  -s, --skip-update    Skip updating existing repositories
-  -v, --verbose        Enable verbose output
-  -V, --version        Show version information and exit
+      --config string      Path to config file (default: ~/.config/github-pokemon/config.yaml)
+  -h, --help               Display help information
+      --include-archived   Include archived repositories
+      --no-color           Disable colored output
+  -o, --org string         GitHub organization to fetch repositories from
+  -j, --parallel int       Number of repositories to process in parallel (default 5)
+  -p, --path string        Local path to clone/update repositories to
+  -s, --skip-update        Skip updating existing repositories
+  -v, --verbose            Enable verbose output
+      --version            Show version information and exit
+```
+
+When `--org` and `--path` are both provided, the tool runs in single-org mode. When omitted, it reads from the config file.
+
+### Config File
+
+Instead of passing `--org` and `--path` every time, you can create a config file at `~/.config/github-pokemon/config.yaml` (or set `XDG_CONFIG_HOME`):
+
+```yaml
+orgs:
+  - org: "my-organization"
+    path: "/home/user/repos/my-org"
+  - org: "another-org"
+    path: "/home/user/repos/another-org"
+
+# Optional defaults (can be overridden by CLI flags)
+parallel: 10
+skip_update: false
+verbose: true
+include_archived: false
+no_color: false
+```
+
+Then simply run:
+
+```bash
+github-pokemon
+```
+
+All orgs will be processed sequentially. You can also point to a custom config file:
+
+```bash
+github-pokemon --config /path/to/my-config.yaml
+```
+
+### Subcommands
+
+#### `prune-archived`
+
+Remove local directories for repositories that have been archived on GitHub:
+
+```bash
+# Dry-run (default) — shows what would be removed
+github-pokemon prune-archived --org "my-org" --path "./repos"
+
+# Actually remove archived repo directories
+github-pokemon prune-archived --org "my-org" --path "./repos" --confirm
+
+# Or use config file to prune across all orgs
+github-pokemon prune-archived
+github-pokemon prune-archived --confirm
 ```
 
 ### Examples
 
 ```bash
 # Clone/fetch with 10 parallel workers
-github-repo-manager --org "my-organization" --path "./repos" --parallel 10
+github-pokemon --org "my-organization" --path "./repos" --parallel 10
 
 # Skip updating existing repositories
-github-repo-manager --org "my-organization" --path "./repos" --skip-update
+github-pokemon --org "my-organization" --path "./repos" --skip-update
+
+# Include archived repositories
+github-pokemon --org "my-organization" --path "./repos" --include-archived
 
 # Verbose output with status information
-github-repo-manager --org "my-organization" --path "./repos" --verbose
+github-pokemon --org "my-organization" --path "./repos" --verbose
 ```
 
 ## How It Works
 
-1. The tool queries the GitHub API to list all repositories in the specified organization
-2. For each non-archived repository:
-   - If it doesn't exist locally, it clones the repository
+1. The tool reads org/path pairs from CLI flags or the config file
+2. For each organization, it queries the GitHub API to list all repositories
+3. For each non-archived repository (or all repos if `--include-archived`):
+   - If it doesn't exist locally, it clones the repository via SSH
    - If it exists locally, it only fetches updates to remote tracking branches
-3. Local working directories are never modified - the tool only updates remote tracking information
+4. Local working directories are never modified - the tool only updates remote tracking information
 
 ## Authentication
 
@@ -136,10 +197,10 @@ export GITHUB_TOKEN="your-github-personal-access-token"
 mkdir -p ~/github-repos
 
 # Clone all repositories from your organization
-github-repo-manager --org "your-organization" --path ~/github-repos
+github-pokemon --org "your-organization" --path ~/github-repos
 
 # Update repositories daily to stay current (could be in a cron job)
-github-repo-manager --org "your-organization" --path ~/github-repos
+github-pokemon --org "your-organization" --path ~/github-repos
 
 # After updating, if you want to update local branches in a specific repository:
 cd ~/github-repos/specific-repo
@@ -159,7 +220,7 @@ You can set up a cron job to automatically update your repositories:
 crontab -e
 
 # Add a line to run the tool daily at 9 AM
-0 9 * * * export GITHUB_TOKEN="your-token"; /path/to/github-repo-manager --org "your-organization" --path ~/github-repos
+0 9 * * * export GITHUB_TOKEN="your-token"; /path/to/github-pokemon --org "your-organization" --path ~/github-repos
 ```
 
 ### Troubleshooting
@@ -171,7 +232,7 @@ If you encounter errors like "permission denied" or "authentication failed":
 1. Verify your GitHub token has the correct permissions
 2. Check that your SSH key is properly set up with GitHub
 3. Ensure your SSH agent is running: `eval "$(ssh-agent -s)"`
-4. Try the verbose flag for more detailed output: `github-repo-manager --org "your-org" --path "./repos" --verbose`
+4. Try the verbose flag for more detailed output: `github-pokemon --org "your-org" --path "./repos" --verbose`
 
 The tool will automatically detect authentication issues and provide helpful guidance.
 
