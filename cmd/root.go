@@ -19,13 +19,19 @@ import (
 )
 
 // version is set via ldflags at build time (GoReleaser) or falls back to
-// the module version embedded by go install.
-var version = func() string {
+// the module version embedded by go install. It must not have a computed
+// initializer, or the linker's -X flag cannot override it.
+var version string
+
+func resolveVersion() string {
+	if version != "" {
+		return version
+	}
 	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
 		return strings.TrimPrefix(info.Main.Version, "v")
 	}
 	return "0.0.0-dev"
-}()
+}
 
 var (
 	organization    string
@@ -100,6 +106,7 @@ func Execute() {
 }
 
 func init() {
+	version = resolveVersion()
 	rootCmd.Version = version
 	rootCmd.SetVersionTemplate("github-pokemon version {{.Version}}\n")
 

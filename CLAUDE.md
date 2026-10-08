@@ -31,7 +31,8 @@ Single-command Cobra CLI app with a `prune-archived` subcommand:
 - `cmd/config.go` — YAML config file loading (`~/.config/github-pokemon/config.yaml`)
 - `cmd/prune_archived.go` — subcommand to remove locally-cloned archived repos
 - `cmd/output.go` — progress bar and grouped result display
-- `cmd/update.go` — background self-update check
+- `cmd/update.go` — background new-version check
+- `cmd/self_update.go` — `self-update` subcommand: downloads, verifies (sha256), and replaces the running binary
 
 The worker pool pattern: `runRootCommand()` creates a buffered channel of repos, spawns `--parallel` (default 5) goroutines via `worker()`, each calling `processRepository()` which either `git clone` or `git fetch --all`.
 

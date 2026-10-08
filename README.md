@@ -154,6 +154,20 @@ github-pokemon --prune --confirm
 
 > The `prune-archived` subcommand is deprecated; use `--prune` instead.
 
+### Updating
+
+github-pokemon checks for a newer release on each run and prints a notice if one exists. To install it in place:
+
+```bash
+# Check only
+github-pokemon self-update --check
+
+# Download, verify against the release checksums.txt, and replace the running binary
+github-pokemon self-update
+```
+
+If the binary lives somewhere you can't write to (e.g. `/usr/local/bin`), re-run with sufficient privileges.
+
 ### Examples
 
 ```bash

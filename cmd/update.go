@@ -73,8 +73,8 @@ func isNewer(latest, current string) bool {
 // parseSemver splits a "MAJOR.MINOR.PATCH" string (ignoring any pre-release
 // suffix after a hyphen) into three integers. Returns nil on failure.
 func parseSemver(v string) []int {
-	// Strip pre-release suffix (e.g. "1.0.0-dev" -> "1.0.0")
-	if idx := strings.IndexByte(v, '-'); idx != -1 {
+	// Strip pre-release and build metadata (e.g. "1.0.0-dev", "1.0.0+dirty" -> "1.0.0")
+	if idx := strings.IndexAny(v, "-+"); idx != -1 {
 		v = v[:idx]
 	}
 	parts := strings.Split(v, ".")
@@ -102,5 +102,6 @@ func printUpdateNotice(ch <-chan updateResult) {
 		return
 	}
 	_, _ = fmt.Fprintf(os.Stderr, "\nA newer version of github-pokemon is available: v%s (current: v%s)\n", result.latest, version)
-	_, _ = fmt.Fprintf(os.Stderr, "Download: https://github.com/%s/%s/releases/latest\n", repoOwner, repoName)
+	_, _ = fmt.Fprintf(os.Stderr, "Update with: github-pokemon self-update\n")
+	_, _ = fmt.Fprintf(os.Stderr, "Or download: https://github.com/%s/%s/releases/latest\n", repoOwner, repoName)
 }
