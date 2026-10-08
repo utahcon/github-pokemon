@@ -110,6 +110,24 @@ Then simply run:
 github-pokemon
 ```
 
+#### Variables
+
+Define reusable values under `vars` and reference them in `path` with `$NAME` or `${NAME}`:
+
+```yaml
+vars:
+  WORKSPACE: /my/path/here
+  OTHERSPACE: /testing
+orgs:
+  - org: "my-org"
+    path: $WORKSPACE/$OTHERSPACE   # -> /my/path/here/testing
+```
+
+- Variables can reference other variables, and fall back to environment variables (e.g. `$HOME`) if not defined under `vars`.
+- A leading `~` expands to your home directory, and the result is cleaned (duplicate slashes removed).
+- Undefined variables and reference cycles are reported as errors.
+- Variables only apply to `path`; the file is never rewritten with expanded values.
+
 All orgs will be processed sequentially. You can also point to a custom config file:
 
 ```bash

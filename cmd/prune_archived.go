@@ -62,7 +62,10 @@ func runPruneRoot(cmd *cobra.Command) error {
 		if err != nil {
 			return fmt.Errorf("--path is required: could not load config: %w", err)
 		}
-		entry, found := configLookupOrg(cfg, pruneOrg)
+		entry, found, err := configLookupOrg(cfg, pruneOrg)
+		if err != nil {
+			return err
+		}
 		if !found {
 			return fmt.Errorf("org %q not found in config file %s; provide --path explicitly", pruneOrg, cfgFile)
 		}
