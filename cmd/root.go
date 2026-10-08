@@ -42,6 +42,7 @@ var (
 	includeArchived bool
 	noColor         bool
 	configPath      string
+	prune           bool
 )
 
 const maxParallelLimit = 50
@@ -116,6 +117,8 @@ func init() {
 	rootCmd.Flags().IntVarP(&parallelLimit, "parallel", "j", 5, "Number of repositories to process in parallel")
 	rootCmd.Flags().BoolVar(&includeArchived, "include-archived", false, "Include archived repositories")
 
+	rootCmd.Flags().BoolVar(&prune, "prune", false, "Remove local directories for repositories archived on GitHub instead of syncing (dry-run unless --confirm is set)")
+	rootCmd.Flags().BoolVar(&pruneConfirm, "confirm", false, "With --prune, actually remove directories (without this flag, runs in dry-run mode)")
 	rootCmd.Flags().BoolVar(&noColor, "no-color", false, "Disable colored output")
 	rootCmd.Flags().StringVar(&configPath, "config", "", "Path to config file (default: ~/.config/github-pokemon/config.yaml)")
 }
@@ -273,6 +276,16 @@ func runRoot(cmd *cobra.Command) error {
 		color.NoColor = true
 	}
 
+	if prune {
+		pruneOrg = organization
+		prunePath = targetPath
+		return runPruneRoot(cmd)
+	}
+
+	if pruneConfirm {
+		return fmt.Errorf("--confirm can only be used with --prune")
+	}
+
 	// If --org and --path are provided, run in single-org mode (backward compatible).
 	if organization != "" && targetPath != "" {
 		if err := runRootCommand(ctx, organization, targetPath); err != nil {
@@ -314,7 +327,10 @@ func runRoot(cmd *cobra.Command) error {
 		if err != nil {
 			return fmt.Errorf("--path is required: could not load config: %w", err)
 		}
-		entry, found := configLookupOrg(cfg, organization)
+		entry, found, err := configLookupOrg(cfg, organization)
+		if err != nil {
+			return err
+		}
 		if !found {
 			return fmt.Errorf("org %q not found in config file %s; provide --path explicitly", organization, cfgFile)
 		}
@@ -438,6 +454,10 @@ func runRootCommand(ctx context.Context, org string, path string) error {
 
 	if includeArchived {
 		fmt.Printf("Including archived repositories (--include-archived)\n")
+	}
+
+	if !includeArchived {
+		defer printPruneNotice(org, absTargetPath, allRepos)
 	}
 
 	if repoCount == 0 {

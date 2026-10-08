@@ -110,29 +110,49 @@ Then simply run:
 github-pokemon
 ```
 
+#### Variables
+
+Define reusable values under `vars` and reference them in `path` with `$NAME` or `${NAME}`:
+
+```yaml
+vars:
+  WORKSPACE: /my/path/here
+  OTHERSPACE: /testing
+orgs:
+  - org: "my-org"
+    path: $WORKSPACE/$OTHERSPACE   # -> /my/path/here/testing
+```
+
+- Variables can reference other variables, and fall back to environment variables (e.g. `$HOME`) if not defined under `vars`.
+- A leading `~` expands to your home directory, and the result is cleaned (duplicate slashes removed).
+- Undefined variables and reference cycles are reported as errors.
+- Variables only apply to `path`; the file is never rewritten with expanded values.
+
 All orgs will be processed sequentially. You can also point to a custom config file:
 
 ```bash
 github-pokemon --config /path/to/my-config.yaml
 ```
 
-### Subcommands
+### Pruning archived repositories
 
-#### `prune-archived`
-
-Remove local directories for repositories that have been archived on GitHub:
+After each run, github-pokemon tells you if any locally cloned repositories have been
+archived on GitHub, along with the command to remove them. Use `--prune` to remove those
+local directories:
 
 ```bash
 # Dry-run (default) — shows what would be removed
-github-pokemon prune-archived --org "my-org" --path "./repos"
+github-pokemon --prune --org "my-org" --path "./repos"
 
 # Actually remove archived repo directories
-github-pokemon prune-archived --org "my-org" --path "./repos" --confirm
+github-pokemon --prune --org "my-org" --path "./repos" --confirm
 
 # Or use config file to prune across all orgs
-github-pokemon prune-archived
-github-pokemon prune-archived --confirm
+github-pokemon --prune
+github-pokemon --prune --confirm
 ```
+
+> The `prune-archived` subcommand is deprecated; use `--prune` instead.
 
 ### Updating
 

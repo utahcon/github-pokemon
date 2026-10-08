@@ -17,8 +17,9 @@ var (
 )
 
 var pruneArchivedCmd = &cobra.Command{
-	Use:   "prune-archived",
-	Short: "Remove local directories for repositories that are archived on GitHub",
+	Use:        "prune-archived",
+	Deprecated: "use the --prune flag instead (e.g. github-pokemon --prune --org my-org --path ./repos)",
+	Short:      "Remove local directories for repositories that are archived on GitHub",
 	Long: `Scans directories in the target path and checks each one against the GitHub API.
 Any directory that corresponds to an archived repository in the specified organization
 will be removed.
@@ -61,7 +62,10 @@ func runPruneRoot(cmd *cobra.Command) error {
 		if err != nil {
 			return fmt.Errorf("--path is required: could not load config: %w", err)
 		}
-		entry, found := configLookupOrg(cfg, pruneOrg)
+		entry, found, err := configLookupOrg(cfg, pruneOrg)
+		if err != nil {
+			return err
+		}
 		if !found {
 			return fmt.Errorf("org %q not found in config file %s; provide --path explicitly", pruneOrg, cfgFile)
 		}
@@ -110,6 +114,48 @@ func runPruneRoot(cmd *cobra.Command) error {
 	return firstErr
 }
 
+// localArchivedDirs returns the names of directories in entries that match
+// archived repositories in repos.
+func localArchivedDirs(entries []os.DirEntry, repos []*github.Repository) []string {
+	archivedSet := make(map[string]bool)
+	for _, repo := range repos {
+		if repo.GetArchived() {
+			archivedSet[repo.GetName()] = true
+		}
+	}
+
+	var names []string
+	for _, entry := range entries {
+		if entry.IsDir() && archivedSet[entry.Name()] {
+			names = append(names, entry.Name())
+		}
+	}
+	return names
+}
+
+// printPruneNotice tells the user which locally cloned repos are archived on
+// GitHub and how to remove them. It prints nothing if there are none.
+func printPruneNotice(org string, absPath string, repos []*github.Repository) {
+	entries, err := os.ReadDir(absPath)
+	if err != nil {
+		return
+	}
+
+	names := localArchivedDirs(entries, repos)
+	if len(names) == 0 {
+		return
+	}
+
+	fmt.Println()
+	fmt.Printf("Notice: %d local repositories are archived on GitHub and can be removed:\n", len(names))
+	for _, name := range names {
+		fmt.Printf("  - %s\n", name)
+	}
+	fmt.Println("Preview removal (dry-run):")
+	fmt.Printf("  github-pokemon --prune --org %q --path %q\n", org, absPath)
+	fmt.Println("Add --confirm to actually remove them.")
+}
+
 func runPruneArchived(ctx context.Context, org string, path string) error {
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
@@ -133,26 +179,10 @@ func runPruneArchived(ctx context.Context, org string, path string) error {
 		return fmt.Errorf("fetching repos for org %s: %w", org, err)
 	}
 
-	archivedSet := make(map[string]bool)
-	for _, repo := range allRepos {
-		if repo.GetArchived() {
-			archivedSet[repo.GetName()] = true
-		}
-	}
-
 	removedCount := 0
 	skippedCount := 0
 
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		name := entry.Name()
-		if !archivedSet[name] {
-			continue
-		}
-
+	for _, name := range localArchivedDirs(entries, allRepos) {
 		dirPath := filepath.Join(absPath, name)
 
 		if !pruneConfirm {
