@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0](https://github.com/utahcon/github-pokemon/compare/v1.5.0...v1.6.0) (2026-10-08)
+
+
+### Features
+
+* add --prune flag and notify about locally cloned archived repos ([#16](https://github.com/utahcon/github-pokemon/issues/16)) ([d0b1564](https://github.com/utahcon/github-pokemon/commit/d0b15647cc961c39dfe83995adbbc10cf417a86f))
+* add self-update command to install the latest release in place ([#18](https://github.com/utahcon/github-pokemon/issues/18)) ([26a3d07](https://github.com/utahcon/github-pokemon/commit/26a3d073825246c81a5b1789e3d3d4e148d32a5e))
+* support variables and expansion in config file paths ([#17](https://github.com/utahcon/github-pokemon/issues/17)) ([13cd392](https://github.com/utahcon/github-pokemon/commit/13cd3925697c8021c0543922b4251b276e0e5c4d))
+
 ## [1.5.0](https://github.com/utahcon/github-pokemon/compare/v1.4.1...v1.5.0) (2026-03-18)
 
 
